@@ -1,4 +1,48 @@
-use std::process::Command;
+use std::error::Error;
+use dict::DictIface;
+
+use BlackNoir::{network, cli};
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let mut banner = vec!("██████╗ ██╗      █████╗  ██████╗ ██╗  ██╗      ███╗   ██╗ ██████╗  ██████╗ ██████╗",
+                          "██╔══██╗██║     ██╔══██╗██╔════╝ ██║ ██╔╝      ████╗  ██║██╔═══██╗ ╚═██╔═╝ ██╔══██╗",
+                          "██████╔╝██║     ███████║██║      █████╔╝       ██╔██╗ ██║██║   ██║   ██║   ██████╔╝",
+                          "██╔══██╗██║     ██╔══██║██║      ██╔═██╗       ██║╚██╗██║██║   ██║   ██║   ██╔══██╗",
+                          "██████╔╝███████╗██║  ██║╚██████╗ ██║  ██╗      ██║ ╚████║╚██████╔╝ ██████╗ ██║  ██║",
+                          "╚═════╝ ╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝      ╚═╝  ╚═══╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝");
+
+    for elem in banner {
+        println!("{}", elem);
+    }
+
+    println!("\nType 'help' for help and 'exit' to leave");
+
+    let interface_dict = network::get_available_interfaces();
+
+    /*
+    println!("Dictionary Content:");
+    for entry in interface_dict.iter() {
+        println!("Key: {}, Value: {:?}", entry.key, entry.val);
+    }*/
+
+    let user_input = cli::prompt_user("Interface to use (index of interface needed): ");
+
+    match interface_dict.get(&user_input) {
+        Some(interface) => {
+            println!("\nSuccessfully bound to: {}", interface.name);
+            println!("Target IP: {}", interface.ip);
+
+            BlackNoir::start_session(&interface);
+        },
+        None => {
+            println!("Error: Invalid interface index selected.");
+        }
+    }
+
+    Ok(())
+}
+
+/*use std::process::Command;
 use std::error::Error;
 use pnet::datalink;
 use pnet::ipnetwork::IpNetwork;
@@ -16,8 +60,6 @@ struct DictEntry {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let _host = "192.168.1.169";
-
     let interfaces = datalink::interfaces();
 
     println!("Interfaces:");
@@ -72,4 +114,4 @@ fn main() -> Result<(), Box<dyn Error>> {
     
 
     Ok(())
-}
+}*/
