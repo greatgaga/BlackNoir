@@ -1,14 +1,15 @@
+use crate::network::{self, InterfaceInfo};
+
 use std::io::{self, Write};
 use clap::{Parser, Subcommand};
 use std::process;
-use std::iter;
 
 #[derive(Parser, Debug)]
 #[command(no_binary_name = true, disable_help_subcommand = true)]
 pub enum NoirTool {
-    Scan {
+    Discover {
         #[arg(short, long)]
-        target: String
+        subnet: String
     },
 
     Exit,
@@ -29,12 +30,14 @@ pub fn prompt_user(prompt_text: &str) -> String {
     user_input.trim().to_string()
 }
 
-pub fn parse(args: &[&str]) {
+pub fn parse(args: &[&str], interface: &network::InterfaceInfo) {
     match NoirTool::try_parse_from(args) {
         Ok(tool) => {
             match tool {
-                NoirTool::Scan{target} => {
+                NoirTool::Discover{subnet} => {
                     println!("Scanning...");
+
+                    network::scan_for_hosts(interface, subnet.to_string());
                 }
 
                 NoirTool::Help => {
@@ -59,8 +62,8 @@ pub fn print_help() {
     println!("──────────────────────────────────────────────────────────────────");
     println!("  COMMAND               USAGE EXAMPLES & DESCRIPTION");
     println!("  -------             --------------------------------------------");
-    println!("  scan                scan --target 192.168.1.1  (or -t)");
-    println!("                      Runs a tactical network footprint scan.");
+    println!("  discover            discover --subnet 192.168.1 (or -s)");
+    println!("                      Runs a tactical network discovery scan.");
     println!();
     println!("  inject              inject --payload \"stealth_ping\" (or -p)");
     println!("                      Transmits custom data packets into target.");
