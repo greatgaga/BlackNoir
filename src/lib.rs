@@ -1,14 +1,20 @@
 pub mod network;
 pub mod cli;
 
+use rustyline::error::ReadlineError;
+use rustyline::DefaultEditor;
+
 pub fn start_session(interface: &network::InterfaceInfo) {
     //println!("{:?}", interface);
 
+    let mut rl = rustyline::DefaultEditor::new().expect("[-] Error while creating session");
+
     loop {
-        let user_input = cli::prompt_user(">> ");
+        if let Some(user_input) = cli::cmd_input(&mut rl){
+            let args: Vec<&str> = user_input.split_whitespace().collect();
 
-        let args: Vec<&str> = user_input.split_whitespace().collect();
-
-        cli::parse(&args, &interface);
+            cli::parse(&args, &interface);
+        }
+        else {}
     }
 }

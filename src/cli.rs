@@ -1,5 +1,8 @@
 use crate::network::{self, InterfaceInfo};
 
+use rustyline::error::ReadlineError;
+use rustyline::DefaultEditor;
+
 use std::io::{self, Write};
 use clap::{Parser, Subcommand};
 use std::process;
@@ -19,13 +22,13 @@ pub enum NoirTool {
         #[arg(short, long, num_args(0..=1), default_missing_value = "1-1024")]
         ports: String,
 
-        #[arg(short, long, default_value_t = true)]
+        #[arg(short, long, default_value_t = false)]
         os: bool,
 
-        #[arg(short, long, default_value_t = true)]
+        #[arg(short, long, default_value_t = false)]
         services: bool,
 
-        #[arg(short, long, default_value_t = true)]
+        #[arg(short, long, default_value_t = false)]
         all: bool,
 
         #[arg(short, long, default_value_t = false)]
@@ -48,6 +51,33 @@ pub fn prompt_user(prompt_text: &str) -> String {
         .expect("Failed to read user input");
 
     user_input.trim().to_string()
+}
+
+pub fn cmd_input(rl: &mut rustyline::DefaultEditor) -> Option<String>{
+    let readline = rl.readline(">> ");
+
+    match readline {
+        Ok(input) => {
+            let trimmed = input.trim();
+
+            if !trimmed.is_empty() {
+                let _ = rl.add_history_entry(trimmed);
+                
+                return Some(trimmed.to_string());
+            }
+        },
+        Err(ReadlineError::Interrupted) => {
+            println!("[-] Interrupted");
+        },
+        Err(ReadlineError::Eof) => {
+            println!("[-] EOF");
+        },
+        Err(err) => {
+            println!("[-] Error: {:?}", err);
+        }
+    };
+
+    return None;
 }
 
 pub fn parse(args: &[&str], interface: &network::InterfaceInfo) {

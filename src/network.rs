@@ -16,6 +16,8 @@ use dict::{Dict, DictIface};
 use std::thread;
 use std::collections::HashSet;
 use std::io::ErrorKind;
+use std::net::TcpStream;
+use std::io::{Read, Write};
 
 #[derive(Debug, Clone)]
 pub struct InterfaceInfo {
@@ -235,7 +237,7 @@ fn get_mac_addr(arp_packet: Vec<u8>, interface_struct: &InterfaceInfo, target: &
     return mac_addr
 }
 
-fn scan_port(interface_struct: &InterfaceInfo, target: &String, mac_addr: &MacAddr, port: u16) {
+fn scan_port(interface_struct: &InterfaceInfo, target: &String, mac_addr: &MacAddr, port: u16, services_scan: bool) {
     let target_ipv4: std::net::Ipv4Addr = target.parse().expect("[-] Invalid target IP");
 
     let builder = PacketBuilder::ethernet2(
@@ -304,6 +306,8 @@ fn scan_port(interface_struct: &InterfaceInfo, target: &String, mac_addr: &MacAd
                         if ipv4_packet.get_next_level_protocol() == pnet::packet::ip::IpNextHeaderProtocols::Tcp {
                             if let Some(tcp_packet) = TcpPacket::new(ipv4_packet.payload()) {
                                 if tcp_packet.get_destination() != 8000 {continue;}
+
+                                //println!("{:?}", tcp_packet);
                                 
                                 let flags = tcp_packet.get_flags();
 
@@ -313,6 +317,8 @@ fn scan_port(interface_struct: &InterfaceInfo, target: &String, mac_addr: &MacAd
                                 else if (flags & TcpFlags::RST != 0) {
                                     println!("Port {} is CLOSED", port);
                                 }
+
+                                break;
                             }
                         }
                     }
@@ -320,7 +326,7 @@ fn scan_port(interface_struct: &InterfaceInfo, target: &String, mac_addr: &MacAd
             },
             Err(e) => {
                 if e.kind() == ErrorKind::TimedOut || e.kind() == ErrorKind::WouldBlock {
-                    println!("Port {} is FILTERED (Timedout)", port);
+                    println!("Port {} is FILTERED or CLOSED(Timedout)", port);
 
                     break;
                 }
@@ -331,9 +337,43 @@ fn scan_port(interface_struct: &InterfaceInfo, target: &String, mac_addr: &MacAd
             }
         }
     }
+
+    if services_scan == true {
+        let address = format!("{}:{}", target_ipv4, port);
+
+        let mut banner: String = String::new();
+
+        match TcpStream::connect_timeout(&address.parse().unwrap(), Duration::from_secs(3)) {
+            Ok(mut stream) => {
+                stream.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+
+                let mut buffer = [0; 1024];
+                
+                match stream.read(&mut buffer) {
+                    Ok(bytes_read) => {
+                        if bytes_read > 0 {
+                            banner = String::from_utf8_lossy(&buffer[..bytes_read]).into();
+                            println!("Version of software for PORT {}: {}", port, banner);
+                        }
+                        else {
+                            println!("Couldn't get version of software for PORT {}", port);
+                        }
+                    }
+                    Err(e) => {
+                        println!("[-] Error while trying to read stream buffer: {}", e);
+                    }
+                };
+            }
+            Err(e) => {
+                println!("[-] Error while opening socket to target for version scan: {}", e);
+            }
+        };
+    }
 }
 
 pub fn scan_host(interface: &InterfaceInfo, target: String, ports: String, os_scan: bool, services_scan: bool) {
+    println!("{}, {}", os_scan, services_scan);
+
     let mut type_of_ports_input = 0;
 
     match ports.find(",") {
@@ -362,7 +402,7 @@ pub fn scan_host(interface: &InterfaceInfo, target: String, ports: String, os_sc
     match type_of_ports_input {
         0 => {
             //println!("[*] Scanning single port");
-            scan_port(interface, &target, &mac_addr, ports.parse().unwrap());
+            scan_port(interface, &target, &mac_addr, ports.parse().unwrap(), services_scan);
         },
         1 => {
             //println!("[*] Scanning list of ports");
@@ -371,7 +411,7 @@ pub fn scan_host(interface: &InterfaceInfo, target: String, ports: String, os_sc
             let ports_collected: Vec<&str> = itertator.collect();
 
             for port in ports_collected {
-                scan_port(interface, &target, &mac_addr, port.parse().unwrap());
+                scan_port(interface, &target, &mac_addr, port.parse().unwrap(), services_scan);
             }
         },
         2 => {
@@ -384,7 +424,7 @@ pub fn scan_host(interface: &InterfaceInfo, target: String, ports: String, os_sc
             let up: u16 = ports_collected[1].parse().expect("[-] Invalid end port");;
 
             for port in down..(up + 1) {
-                scan_port(interface, &target, &mac_addr, port);
+                scan_port(interface, &target, &mac_addr, port, services_scan);
             }
         }
         _ => {}
