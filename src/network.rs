@@ -237,7 +237,7 @@ fn get_mac_addr(arp_packet: Vec<u8>, interface_struct: &InterfaceInfo, target: &
     return mac_addr
 }
 
-fn scan_port(interface_struct: &InterfaceInfo, target: &String, mac_addr: &MacAddr, port: u16, services_scan: bool) {
+fn scan_port(interface_struct: &InterfaceInfo, target: &String, mac_addr: &MacAddr, port: u16, services_scan: bool, os_scan: bool) {
     let target_ipv4: std::net::Ipv4Addr = target.parse().expect("[-] Invalid target IP");
 
     let builder = PacketBuilder::ethernet2(
@@ -318,6 +318,25 @@ fn scan_port(interface_struct: &InterfaceInfo, target: &String, mac_addr: &MacAd
                                     println!("Port {} is CLOSED", port);
                                 }
 
+                                if os_scan == true {
+                                    let ttl = ipv4_packet.get_ttl();
+
+                                    if ttl < ((64 as f32) * 0.8) as u8 {
+                                        println!("OS of target calculated from PORT {} is: Microcontroller/Embedded Device", port);
+                                    } else if (ttl <= ((64 as f32) * 1.2) as u8) && (ttl >= ((64 as f32) * 0.8) as u8) {
+                                        println!("OS of target calculated from PORT {} is: Linux/Microcontroller/Embedded Device", port);
+                                    } else if (ttl <= ((128 as f32) * 1.2) as u8) && (ttl >= ((128 as f32) * 0.8) as u8) {
+                                        println!("OS of target calculated from PORT {} is: Windows", port);
+                                    } else if (ttl <= ((255 as f32) * 1.0) as u8) && (ttl >= ((255 as f32) * 0.8) as u8) {
+                                        //                            ^
+                                        //                            |
+                                        //                       cuz its 8-bit
+                                        println!("OS of target calculated from PORT {} is: MacOS", port);
+                                    } else {
+                                        println!("OS of target calculated from PORT {} is: Unknown", port);
+                                    }
+                                }  
+
                                 break;
                             }
                         }
@@ -372,7 +391,7 @@ fn scan_port(interface_struct: &InterfaceInfo, target: &String, mac_addr: &MacAd
 }
 
 pub fn scan_host(interface: &InterfaceInfo, target: String, ports: String, os_scan: bool, services_scan: bool) {
-    println!("{}, {}", os_scan, services_scan);
+    //println!("{}, {}", os_scan, services_scan);
 
     let mut type_of_ports_input = 0;
 
@@ -402,7 +421,7 @@ pub fn scan_host(interface: &InterfaceInfo, target: String, ports: String, os_sc
     match type_of_ports_input {
         0 => {
             //println!("[*] Scanning single port");
-            scan_port(interface, &target, &mac_addr, ports.parse().unwrap(), services_scan);
+            scan_port(interface, &target, &mac_addr, ports.parse().unwrap(), services_scan, os_scan);
         },
         1 => {
             //println!("[*] Scanning list of ports");
@@ -411,7 +430,7 @@ pub fn scan_host(interface: &InterfaceInfo, target: String, ports: String, os_sc
             let ports_collected: Vec<&str> = itertator.collect();
 
             for port in ports_collected {
-                scan_port(interface, &target, &mac_addr, port.parse().unwrap(), services_scan);
+                scan_port(interface, &target, &mac_addr, port.parse().unwrap(), services_scan, os_scan);
             }
         },
         2 => {
@@ -424,7 +443,7 @@ pub fn scan_host(interface: &InterfaceInfo, target: String, ports: String, os_sc
             let up: u16 = ports_collected[1].parse().expect("[-] Invalid end port");;
 
             for port in down..(up + 1) {
-                scan_port(interface, &target, &mac_addr, port, services_scan);
+                scan_port(interface, &target, &mac_addr, port, services_scan, os_scan);
             }
         }
         _ => {}
